@@ -1,42 +1,8 @@
 点击关注[公众号](#公众号)及时获取笔主最新更新文章，并可免费领取本文档配套的《Java面试突击》以及Java工程师必备学习资源。
 
-<!-- TOC -->
 
-- [Java 并发进阶常见面试题总结](#java-并发进阶常见面试题总结)
-    - [1. synchronized 关键字](#1-synchronized-关键字)
-        - [1.1. 说一说自己对于 synchronized 关键字的了解](#11-说一说自己对于-synchronized-关键字的了解)
-        - [1.2. 说说自己是怎么使用 synchronized 关键字，在项目中用到了吗](#12-说说自己是怎么使用-synchronized-关键字在项目中用到了吗)
-        - [1.3. 讲一下 synchronized 关键字的底层原理](#13-讲一下-synchronized-关键字的底层原理)
-        - [1.4. 说说 JDK1.6 之后的synchronized 关键字底层做了哪些优化，可以详细介绍一下这些优化吗](#14-说说-jdk16-之后的synchronized-关键字底层做了哪些优化可以详细介绍一下这些优化吗)
-        - [1.5. 谈谈 synchronized和ReentrantLock 的区别](#15-谈谈-synchronized和reentrantlock-的区别)
-    - [2. volatile关键字](#2-volatile关键字)
-        - [2.1. 讲一下Java内存模型](#21-讲一下java内存模型)
-        - [2.2. 说说 synchronized 关键字和 volatile 关键字的区别](#22-说说-synchronized-关键字和-volatile-关键字的区别)
-    - [3. ThreadLocal](#3-threadlocal)
-        - [3.1. ThreadLocal简介](#31-threadlocal简介)
-        - [3.2. ThreadLocal示例](#32-threadlocal示例)
-        - [3.3. ThreadLocal原理](#33-threadlocal原理)
-        - [3.4. ThreadLocal 内存泄露问题](#34-threadlocal-内存泄露问题)
-    - [4. 线程池](#4-线程池)
-        - [4.1. 为什么要用线程池？](#41-为什么要用线程池)
-        - [4.2. 实现Runnable接口和Callable接口的区别](#42-实现runnable接口和callable接口的区别)
-        - [4.3. 执行execute()方法和submit()方法的区别是什么呢？](#43-执行execute方法和submit方法的区别是什么呢)
-        - [4.4. 如何创建线程池](#44-如何创建线程池)
-    - [5. Atomic 原子类](#5-atomic-原子类)
-        - [5.1. 介绍一下Atomic 原子类](#51-介绍一下atomic-原子类)
-        - [5.2. JUC 包中的原子类是哪4类?](#52-juc-包中的原子类是哪4类)
-        - [5.3. 讲讲 AtomicInteger 的使用](#53-讲讲-atomicinteger-的使用)
-        - [5.4. 能不能给我简单介绍一下 AtomicInteger 类的原理](#54-能不能给我简单介绍一下-atomicinteger-类的原理)
-    - [6. AQS](#6-aqs)
-        - [6.1. AQS 介绍](#61-aqs-介绍)
-        - [6.2. AQS 原理分析](#62-aqs-原理分析)
-            - [6.2.1. AQS 原理概览](#621-aqs-原理概览)
-            - [6.2.2. AQS 对资源的共享方式](#622-aqs-对资源的共享方式)
-            - [6.2.3. AQS底层使用了模板方法模式](#623-aqs底层使用了模板方法模式)
-        - [6.3. AQS 组件总结](#63-aqs-组件总结)
-    - [7 Reference](#7-reference)
 
-<!-- /TOC -->
+[toc]
 
 # Java 并发进阶常见面试题总结
 
@@ -148,7 +114,28 @@ JDK1.6 对锁的实现引入了大量的优化，如偏向锁、轻量级锁、�
 
 关于这几种优化的详细信息可以查看笔主的这篇文章：<https://gitee.com/SnailClimb/JavaGuide/blob/master/docs/java/Multithread/synchronized.md>
 
-### 1.5. 谈谈 synchronized和ReentrantLock 的区别
+### 1.5. Synchronized和Lock的区别
+
+1. 隐性锁和显性锁
+   - 隐性锁：每个JAVA对象可以用作实现同步的内置锁，线程在访问同步代码块时必须先获取该内置锁，在退出和中断的时候需要释放内置锁。Java内置锁通过synchronized关键字使用，使用其修饰方法或者代码块，就能保证方法或者代码块以同步方式执行。有对象锁和类锁（static方法和class上枷锁）区分，两者不冲突可以并行存在。
+   - 显性锁：显式锁(ReentrantLock)正式为了解决这些灵活需求而生，ReentrantLock的字面意思是可重入锁，可重入的意思是线程可以同时多次请求同一把锁，而不会自己导致自己死锁。
+
+2. 底层实现
+
+   - Synchronized：底层使用指令码方式来控制锁的，映射成字节码指令就是增加来两个指令：monitorenter和monitorexit。当线程执行遇到monitorenter指令时会尝试获取内置锁，如果获取锁则锁计数器+1，如果没有获取锁则阻塞；当遇到monitorexit指令时锁计数器-1，如果计数器为0则释放锁。
+
+   - Lock：底层是CAS乐观锁，依赖AbstractQueuedSynchronizer类，把所有的请求线程构成一个CLH队列。而对该队列的操作均通过Lock-Free（CAS）操作。
+
+3. 比较
+
+   - Synchronized是关键字，内置语言实现，Lock是接口。
+   - Synchronized在线程发生异常时会自动释放锁，因此不会发生异常死锁。Lock异常时不会自动释放锁，所以需要在finally中实现释放锁。
+   - Lock是可以中断锁，Synchronized是非中断锁，必须等待线程执行完成释放锁。
+   - Lock可以使用读锁提高多线程读效率。
+
+
+
+### 1.6. 谈谈 synchronized和ReentrantLock 的区别
 
 
 **① 两者都是可重入锁**
