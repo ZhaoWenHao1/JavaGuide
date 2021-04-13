@@ -153,8 +153,18 @@ public class ScheduledThreadPoolExecutor
 **`ThreadPoolExecutor` 3 个最重要的参数：**
 
 - **`corePoolSize` :** 核心线程数线程数定义了最小可以同时运行的线程数量。
+
 - **`maximumPoolSize` :** 当队列中存放的任务达到队列容量的时候，当前可以同时运行的线程数量变为最大线程数。
-- **`workQueue`:** 当新任务来的时候会先判断当前运行的线程数量是否达到核心线程数，如果达到的话，信任就会被存放在队列中。
+
+- **`workQueue`:** 当新任务来的时候会先判断当前运行的线程数量是否达到核心线程数，如果达到的话，新任务就会被存放在队列中。
+
+  BlockingQueue的常用实现类：
+
+  - LinkedBlockingQueue
+
+    没有大小限制，队列容量无限大，等待队列永远不会满，线程池中运行的线程数永远不会超过corePoolSize
+
+  - ArrayBlockingQueue
 
 `ThreadPoolExecutor`其他常见参数:
 
@@ -652,9 +662,9 @@ Wed Nov 13 13:40:43 CST 2019::pool-1-thread-5
 2. 当前线程池中有一个运行的线程后，将任务加入 `LinkedBlockingQueue`
 3. 线程执行完当前的任务后，会在循环中反复从` LinkedBlockingQueue` 中获取任务来执行；
 
-#### 5.2.3 为什么不推荐使用`FixedThreadPool`？ 
+#### 5.2.3 为什么不推荐使用`SingleThreadExecutor`？ 
 
-`SingleThreadExecutor` 使用无界队列 `LinkedBlockingQueue` 作为线程池的工作队列（队列的容量为 Intger.MAX_VALUE）。`SingleThreadExecuto`r 使用无界队列作为线程池的工作队列会对线程池带来的影响与 `FixedThreadPool` 相同。说简单点就是可能会导致 OOM，
+`SingleThreadExecutor` 使用无界队列 `LinkedBlockingQueue` 作为线程池的工作队列（队列的容量为 Intger.MAX_VALUE）。`SingleThreadExecutor` 使用无界队列作为线程池的工作队列会对线程池带来的影响与 `FixedThreadPool` 相同。说简单点就是可能会导致 OOM，
 
 ### 5.3 CachedThreadPool 详解
 

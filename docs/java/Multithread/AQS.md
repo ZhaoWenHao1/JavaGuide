@@ -111,14 +111,19 @@ static final class FairSync extends Sync {
     }
     // AbstractQueuedSynchronizer.acquire(int arg)
     public final void acquire(int arg) {
+        // 先尝试tryAcquire获取资源，tryAcquire也是以公平锁的方式
+        // 如果不能获得资源，并且将当前线程放入到队列成功后自我中断当前线程
+        // addWaiter中调用enq，将当前线程加入到等待队列
         if (!tryAcquire(arg) &&
             acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
             selfInterrupt();
     }
+    
+    // 只有两种情况可以获得锁： 1.当前无线程持锁且无线程等待该锁 2.持有该锁的是当前线程
     protected final boolean tryAcquire(int acquires) {
         final Thread current = Thread.currentThread();
         int c = getState();
-        if (c == 0) {
+        if (c == 0) { // 没有线程持有该锁
             // 1. 和非公平锁相比，这里多了一个判断：是否有线程在等待
             if (!hasQueuedPredecessors() &&
                 compareAndSetState(0, acquires)) {
@@ -126,6 +131,8 @@ static final class FairSync extends Sync {
                 return true;
             }
         }
+        // 已有线程拿到该锁
+        // 如果当前线程就是独占资源的线程则state+=acquires,即加锁
         else if (current == getExclusiveOwnerThread()) {
             int nextc = c + acquires;
             if (nextc < 0)
@@ -163,6 +170,7 @@ static final class NonfairSync extends Sync {
  * Performs non-fair tryLock.  tryAcquire is implemented in
  * subclasses, but both need nonfair try for trylock method.
  */
+// 两种情况获得锁：1.无线程持有该锁进行CAS抢占资源成功（无需判断是否有线程在等待该锁）  2.持有该锁的是当前线程（重入）
 final boolean nonfairTryAcquire(int acquires) {
     final Thread current = Thread.currentThread();
     int c = getState();
@@ -238,7 +246,91 @@ tryReleaseShared(int)//共享方式。尝试释放资源，成功则返回true�
 
 ### 3 Semaphore(信号量)-允许多个线程同时访问
 
-**synchronized 和 ReentrantLock 都是一次只允许一个线程访问某个资源，Semaphore(信号量)可以指定多个线程同时访问某个资源。** 示例代码如下：
+#### 3.1 简介
+
+**synchronized 和 ReentrantLock 都是一次只允许一个线程访问某个资源，Semaphore(信号量)可以指定多个线程同时访问某个资源。** 
+
+Semaphore有一个构造函数，可以传入一个int型整数n，表示某段代码最多只有n个线程可以访问，如果超出了n，那么请等待，等到某个线程执行完毕这段代码块，下一个线程再进入。
+
+信号量上定义两种操作:
+
+- acquire(x):当一个线程调用acquire操作时,它要么成功获取到信号量(信号量减1/x),要么一直等下去,直到有线程释放信号量,或超时,Semaphore内部会维护一个等待队列用于存储这些被暂停的线程.
+- release(x)实际上会将信号量的值+1/x,然后唤醒相应Sepmaphore实例的等待队列中的一个任意等待线程.
+
+**应用场景**
+
+- **控制线程并发的数量**
+- 多个共享资源的互斥使用
+
+#### 3.2 方法列表
+
+https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/util/concurrent/Semaphore.html
+
+http://itmyhome.com/java-api/java/util/concurrent/Semaphore.html
+
+```java
+
+// 构造一个有permits个许可的信号量，默认非公平
+Semaphore(int permits)
+
+// 构造一个有permits个许可的公平/不公平的信号量
+Semaphore(int permits, boolean fair)
+
+// 从此信号量获取一个许可，在提供一个许可前一直将线程阻塞，或者被中断
+void acquire()
+
+// 从此信号量获取`permits`个许可，在提供这些许可前一直将线程阻塞，或者被中断
+void acquire(int permits)
+
+// 从此信号量获取一个许可，在没有可用的许可之前一直被阻塞，不能被中断
+void acquireUninterruptibly()
+
+// 从此信号量获取`permits`个许可，在没有可用的许可之前一直被阻塞，不能被中断
+void acquireUninterruptibly(int permits)
+
+// 返回此信号量中可用的当前许可数。
+int availablePermits()
+
+// 获取并返回立即可用的所有许可数，并且将可用许可置0.
+int  drainPermits()
+
+// 获取等待获取许可的线程集合
+protected Collection<Thread>  getQueuedThreads()
+
+// 获取等待许可的线程个数
+int  getQueueLength()
+
+// 判断是否有线程在等待这个许可
+boolean	hasQueuedThreads()
+
+// 判断该信号量是否公平
+boolean	isFair()
+
+// 减少`reduction`个许可
+protected void  reducePermits(int reduction)
+
+// 释放一个许可
+void release()
+
+// 释放`permits` 个许可
+void release(int permits)
+
+// 尝试获取1个许可，获取不到就返回`false`，不阻塞
+boolean	tryAcquire()
+
+// 尝试获取`permits`个许可，获取不到就返回`false`，不阻塞。
+boolean	tryAcquire(int permits)
+
+// 尝试在timeout个unit时间内不被中断地获取一个许可，获取不到就返回`false`，不阻塞
+### boolean	tryAcquire(long timeout, TimeUnit unit)
+
+// 尝试在timeout个unit时间内不被中断地获取`permits`个许可，获取不到就返回`false`，不阻塞
+### boolean	tryAcquire(int permits, long timeout, TimeUnit unit)
+```
+
+
+
+示例代码如下：
 
 ```java
 /**
@@ -295,6 +387,8 @@ public class SemaphoreExample1 {
 
 除了 `acquire`方法之外，另一个比较常用的与之对应的方法是`tryAcquire`方法，该方法如果获取不到许可就立即返回 false。
 
+#### 3.3 Semaphore 源码分析
+
 Semaphore 有两种模式，公平模式和非公平模式。
 
 - **公平模式：** 调用 acquire 的顺序就是获取许可证的顺序，遵循 FIFO；
@@ -313,6 +407,66 @@ Semaphore 有两种模式，公平模式和非公平模式。
 ```
 
 **这两个构造方法，都必须提供许可的数量，第二个构造方法可以指定是公平模式还是非公平模式，默认非公平模式。**
+
+Semaphore的实现与ReentrantLock相似，都是在其内部实现了NonfairSync和FairSync两个同步器，但ReentrantLock默认state为0，加锁就将state加一，释放锁将state减一，而Semaphore是将state初始化为permits，获取资源将state减少，释放资源将state增加。
+
+Semaphore的acquire()方法：
+
+```java
+public void acquire() throws InterruptedException {
+    	// 默认是可中断的获取许可
+        sync.acquireSharedInterruptibly(1);
+}
+public final void acquireSharedInterruptibly(int arg)
+    throws InterruptedException {
+    // 如果线程中断，则抛出异常
+    if (Thread.interrupted())
+        throw new InterruptedException();
+    // 尝试获取许可，如果成功返回剩余许可数（大于0），否则失败
+    // 失败时加入到等待队列
+    if (tryAcquireShared(arg) < 0)
+        doAcquireSharedInterruptibly(arg);
+}
+```
+
+公平Semaphore和非公平Semaphore的主要区别在于tryAcquireShared方法不同。
+
+公平Semaphore的tryAcquireShared:
+
+```java
+// 只有没有线程等待获取许可，且当前许可数大于等于需求时才能成功获得许可
+protected int tryAcquireShared(int acquires) {
+    for (;;) {
+        // 如果有等待的线程，则获取许可失败
+        if (hasQueuedPredecessors())
+            return -1;
+        int available = getState();
+        int remaining = available - acquires;
+        if (remaining < 0 ||
+            compareAndSetState(available, remaining))
+            return remaining;
+    }
+}
+```
+
+非公平Semaphore的tryAcquireShared:
+
+```java
+protected int tryAcquireShared(int acquires) {
+    return nonfairTryAcquireShared(acquires);
+}
+// 不考虑是否有其他线程等待获取许可，直接尝试争夺资源
+// 只有当资源不够时才会进入到等待队列，否则一直尝试争夺，直至成功
+final int nonfairTryAcquireShared(int acquires) {
+    for (;;) {
+        int available = getState();
+        int remaining = available - acquires;
+        if (remaining < 0 ||
+            compareAndSetState(available, remaining))
+            return remaining;
+    }
+}
+```
 
 由于篇幅问题，如果对 Semaphore 源码感兴趣的朋友可以看下面这篇文章：
 
@@ -684,12 +838,14 @@ threadnum:7is finish
 
 CountDownLatch 是计数器，只能使用一次，而 CyclicBarrier 的计数器提供 reset 功能，可以多次使用。但是我不那么认为它们之间的区别仅仅就是这么简单的一点。我们来从 jdk 作者设计的目的来看，javadoc 是这么描述它们的：
 
-> CountDownLatch: A synchronization aid that allows one or more threads to wait until a set of operations being performed in other threads completes.(CountDownLatch: 一个或者多个线程，等待其他多个线程完成某件事情之后才能执行；)
-> CyclicBarrier : A synchronization aid that allows a set of threads to all wait for each other to reach a common barrier point.(CyclicBarrier : 多个线程互相等待，直到到达同一个同步点，再继续一起执行。)
+> CountDownLatch: A synchronization aid that allows one or more threads to wait until a set of operations being performed in other threads completes.(CountDownLatch: 一个或者多个线程，等待其他多个线程完成某件事情之后才能执行；)  递减
+> CyclicBarrier : A synchronization aid that allows a set of threads to all wait for each other to reach a common barrier point.(CyclicBarrier : 多个线程互相等待，直到到达同一个同步点，再继续一起执行。)  递增
 
 对于 CountDownLatch 来说，重点是“一个线程（多个线程）等待”，而其他的 N 个线程在完成“某件事情”之后，可以终止，也可以等待。而对于 CyclicBarrier，重点是多个线程，在任意一个线程没有完成，所有的线程都必须等待。
 
 CountDownLatch 是计数器，线程完成一个记录一个，只不过计数不是递增而是递减，而 CyclicBarrier 更像是一个阀门，需要所有线程都到达，阀门才能打开，然后继续执行。
+
+
 
 ### 6 ReentrantLock 和 ReentrantReadWriteLock
 
