@@ -727,7 +727,51 @@ Wed Nov 13 13:40:43 CST 2019::pool-1-thread-5
 
 > **备注：** Quartz 是一个由 java 编写的任务调度库，由 OpenSymphony 组织开源出来。在实际项目开发中使用 Quartz 的还是居多，比较推荐使用 Quartz。因为 Quartz 理论上能够同时对上万个任务进行调度，拥有丰富的功能特性，包括任务调度、任务持久化、可集群化、插件等等。
 
-### 6.2 运行机制
+### 6.2 方法
+
+```java
+// 在一定延迟之后只执行一次某个任务,无返回值
+public ScheduledFuture<?> schedule(Runnable command, long delay, TimeUnit unit);
+
+// 在一定延迟之后只执行一次某个任务,有返回值
+public <V> ScheduledFuture<V> schedule(Callable<V> callable, long delay, TimeUnit unit);
+
+// 在一定延迟(initialDelay)之后周期性的执行某个任务，执行任务的间隔是固定的，无论上一个任务是否执行完成,周期间隔为delay
+public ScheduledFuture<?> scheduleWithFixedDelay(Runnable command,
+                                                 long initialDelay, long delay, TimeUnit unit);
+
+// 在一定延迟之后周期性的执行某个任务,执行时间间隔是不固定的，其会在周期任务的上一个任务执行完成之后才开始计时，并在指定时间间隔之后才开始执行任务
+public ScheduledFuture<?> scheduleAtFixedRate(Runnable command,
+                                                  long initialDelay, long period, TimeUnit unit);
+// 取得队列中的将要被运行的任务，正在运行的任务不在该队列里 周期性执行的任务奖杯运行的任务也都在这个队列里
+getQueue();
+    
+// 删除队列里将要被运行的任务
+remove();
+
+// 当对ScheduledThreadPoolExecutor执行了shutdown方法时，设置任务是否继续运行，与schedule配合使用
+setExecuteExistingDelayedTasksAfterShutdownPolicy(boolean value);
+
+// 当对ScheduledThreadPoolExecutor执行了shutdown方法时，设置任务是否继续重复运行，与scheduleWithFixedDelay或scheduleAtFixedRate配合使用
+setContinueExistingPeriodicTasksAfterShutdownPolicy(boolean value)
+
+// 是否将取消后的任务从队列中清除,默认任务取消并不会从队列里清除   任务取消：future = pool.schedule(...); future.cancel(true)
+setRemoveOnCancelPolicy(boolean value)
+
+    
+    
+```
+
+
+
+注意：
+
+- ScheduledThreadPoolExecutor继承自ThreadPoolExecutor（[ThreadPoolExecutor详解](https://link.jianshu.com?t=https%3A%2F%2Fmy.oschina.net%2Fzhangxufeng%2Fblog%2F1594325)），因而也有继承而来的execute()和submit()方法，但是ScheduledThreadPoolExecutor重写了这两个方法，重写的方式是直接创建两个立即执行并且只执行一次的任务；
+- ScheduledThreadPoolExecutor使用ScheduledFutureTask封装每个需要执行的任务，而任务都是放入DelayedWorkQueue队列中的，该队列是一个使用数组实现的优先队列，在调用ScheduledFutureTask::cancel()方法时，其会根据removeOnCancel变量的设置来确认是否需要将当前任务真正的从队列中移除，而不只是标识其为已删除状态；？？？
+- ScheduledThreadPoolExecutor提供了一个钩子方法decorateTask(Runnable, RunnableScheduledFuture)用于对执行的任务进行装饰，该方法第一个参数是调用方传入的任务实例，第二个参数则是使用ScheduledFutureTask对用户传入任务实例进行封装之后的实例。这里需要注意的是，在ScheduledFutureTask对象中有一个heapIndex变量，该变量用于记录当前实例处于队列数组中的下标位置，该变量可以将诸如contains()，remove()等方法的时间复杂度从O(N)降低到O(logN)，因而效率提升是比较高的，但是如果这里用户重写decorateTask()方法封装了队列中的任务实例，那么heapIndex的优化就不存在了，因而这里强烈建议是尽量不要重写该方法，或者重写时也还是复用ScheduledFutureTask类
+- 
+
+### 6.3 运行机制
 
 ![ScheduledThreadPoolExecutor运行机制](https://imgconvert.csdnimg.cn/aHR0cDovL215LWJsb2ctdG8tdXNlLm9zcy1jbi1iZWlqaW5nLmFsaXl1bmNzLmNvbS8xOC00LTE2LzkyNTk0Njk4LmpwZw?x-oss-process=image/format,png)
 
@@ -742,7 +786,7 @@ Wed Nov 13 13:40:43 CST 2019::pool-1-thread-5
 - 获取任务的方不同
 - 执行周期任务后，增加了额外的处理
 
-### 6.3 ScheduledThreadPoolExecutor 执行周期任务的步骤
+### 6.4 ScheduledThreadPoolExecutor 执行周期任务的步骤
 
 ![ScheduledThreadPoolExecutor执行周期任务的步骤](https://imgconvert.csdnimg.cn/aHR0cDovL215LWJsb2ctdG8tdXNlLm9zcy1jbi1iZWlqaW5nLmFsaXl1bmNzLmNvbS8xOC01LTMwLzU5OTE2Mzg5LmpwZw?x-oss-process=image/format,png)
 
@@ -750,6 +794,12 @@ Wed Nov 13 13:40:43 CST 2019::pool-1-thread-5
 2. 线程 1 执行这个 `ScheduledFutureTask`；
 3. 线程 1 修改 `ScheduledFutureTask` 的 time 变量为下次将要被执行的时间；
 4. 线程 1 把这个修改 time 之后的 `ScheduledFutureTask` 放回 `DelayQueue` 中（`DelayQueue.add()`)。
+
+### 6.5 源码详解
+
+https://www.jianshu.com/p/203b28223c70
+
+
 
 ## 七 线程池大小确定
 
