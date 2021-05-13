@@ -145,6 +145,8 @@ static final class FairSync extends Sync {
 }
 ```
 
+
+
 非公平锁的 lock 方法：
 
 ```java
@@ -200,6 +202,10 @@ final boolean nonfairTryAcquire(int acquires) {
 公平锁和非公平锁就这两点区别，如果这两次 CAS 都不成功，那么后面非公平锁和公平锁是一样的，都要进入到阻塞队列等待唤醒。
 
 相对来说，非公平锁会有更好的性能，因为它的吞吐量比较大。当然，非公平锁让获取锁的时间变得更加不确定，可能会导致在阻塞队列中的线程长期处于饥饿状态。
+
+##### 如何获得当前持有锁的线程？
+
+ReentrantLock中的Sync继承了AbstractQueuedSynchronizer，而AbstractQueuedSynchronizer又继承了AbstractOwnableSynchronizer，AbstractOwnableSynchronizer类有一个成员变量exclusiveOwnerThread用于保存独占模式下持有该锁的线程
 
 **2)Share**（共享）
 
